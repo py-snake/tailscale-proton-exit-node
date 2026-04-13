@@ -1,0 +1,15 @@
+[Unit]
+Description=Configure Tailscale as exit node
+After=tailscaled.service systemd-networkd.service kill-switch.service
+Requires=tailscaled.service
+Wants=systemd-networkd-wait-online.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/ts-configure.sh
+PassEnvironment=TS_AUTHKEY TS_HOSTNAME TS_EXTRA_ARGS
+ExecStartPre=/bin/sleep 3
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,13 @@
+[Unit]
+Description=Generate WireGuard config from environment
+Before=systemd-networkd.service
+After=systemd-sysctl.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/wg-config.sh
+PassEnvironment=WG_PRIVATE_KEY WG_PEER_PUBLIC_KEY WG_ENDPOINT WG_ADDRESS WG_DNS
+
+[Install]
+WantedBy=multi-user.target

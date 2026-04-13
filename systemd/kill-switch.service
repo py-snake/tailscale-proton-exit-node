@@ -1,0 +1,14 @@
+[Unit]
+Description=VPN kill switch (prohibit routes)
+After=systemd-networkd.service wg-config.service
+Wants=systemd-networkd.service
+ConditionEnvironment=KILL_SWITCH=true
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/kill-switch.sh
+PassEnvironment=KILL_SWITCH
+
+[Install]
+WantedBy=multi-user.target
