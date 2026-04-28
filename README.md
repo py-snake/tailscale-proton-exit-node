@@ -32,7 +32,7 @@ Tailscale peers ──► tailscale0 ──► proton0 (WireGuard) ──► Pro
 ### 1. Clone and configure
 
 ```bash
-git clone https://codeberg.org/richharvey/tailscale-proton-exit-node.git
+git clone https://codeberg.org/ric_harvey/tailscale-proton-exit-node.git
 cd tailscale-proton-exit-node
 cp env.example .env
 ```
