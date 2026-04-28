@@ -1,0 +1,47 @@
+name: Build and push container
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE: codeberg.org/${{ github.repository_owner }}/tailscale-proton-exit-node
+
+jobs:
+  build:
+    runs-on: codeberg-medium-lazy
+    steps:
+      - uses: https://code.forgejo.org/actions/checkout@v4
+
+      - name: Install buildah
+        run: apt-get update -qq && apt-get install -y buildah ca-certificates
+
+      - name: Build multi-arch manifest
+        env:
+          STORAGE_DRIVER: vfs
+          BUILDAH_ISOLATION: chroot
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          DATE=$(date -u +%Y%m%d)
+          buildah manifest create "$IMAGE:latest"
+          for arch in amd64 arm64; do
+            buildah bud \
+              --storage-driver=vfs --isolation=chroot \
+              --platform=linux/$arch \
+              --manifest "$IMAGE:latest" \
+              -f Dockerfile .
+          done
+          buildah tag "$IMAGE:latest" "$IMAGE:sha-$SHORT_SHA" "$IMAGE:$DATE"
+
+      - name: Push to Codeberg registry
+        run: |
+          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          DATE=$(date -u +%Y%m%d)
+          buildah login -u "${{ github.repository_owner }}" \
+            -p "${{ secrets.PACKAGES_TOKEN }}" codeberg.org
+          for tag in latest sha-$SHORT_SHA $DATE; do
+            buildah manifest push --all \
+              --storage-driver=vfs \
+              "$IMAGE:$tag" "docker://$IMAGE:$tag"
+          done
