@@ -1,4 +1,4 @@
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     systemd \
@@ -12,9 +12,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Tailscale from official repo
-RUN curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg \
+RUN curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.noarmor.gpg \
       -o /usr/share/keyrings/tailscale-archive-keyring.gpg && \
-    curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.tailscale-keyring.list \
+    curl -fsSL https://pkgs.tailscale.com/stable/debian/trixie.tailscale-keyring.list \
       -o /etc/apt/sources.list.d/tailscale.list && \
     apt-get update && apt-get install -y --no-install-recommends tailscale && \
     rm -rf /var/lib/apt/lists/*
@@ -51,9 +51,6 @@ RUN systemctl enable tailscaled wg-config ts-configure kill-switch
 
 # Tailscale state persisted via volume
 VOLUME /var/lib/tailscale
-
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-    CMD /usr/local/bin/healthcheck.sh
 
 STOPSIGNAL SIGRTMIN+3
 ENTRYPOINT ["/lib/systemd/systemd"]

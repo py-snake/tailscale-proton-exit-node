@@ -10,43 +10,39 @@ env:
 
 jobs:
   build:
-    runs-on: codeberg-medium-lazy
+    runs-on: sqcows
     steps:
-      - uses: https://code.forgejo.org/actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install buildah and QEMU
-        run: |
-          apt-get update -qq
-          apt-get install -y --no-install-recommends \
-            buildah ca-certificates qemu-user-static binfmt-support
-          update-binfmts --enable qemu-aarch64 || true
-          ls /proc/sys/fs/binfmt_misc/ || true
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-      - name: Build multi-arch manifest
-        env:
-          STORAGE_DRIVER: vfs
-          BUILDAH_ISOLATION: chroot
-        run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          DATE=$(date -u +%Y%m%d)
-          buildah manifest create "$IMAGE:latest"
-          for arch in amd64 arm64; do
-            buildah bud \
-              --storage-driver=vfs --isolation=chroot \
-              --platform=linux/$arch \
-              --manifest "$IMAGE:latest" \
-              -f Dockerfile .
-          done
-          buildah tag "$IMAGE:latest" "$IMAGE:sha-$SHORT_SHA" "$IMAGE:$DATE"
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Push to Codeberg registry
-        run: |
-          SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)
-          DATE=$(date -u +%Y%m%d)
-          buildah login -u "${{ github.repository_owner }}" \
-            -p "${{ secrets.PACKAGES_TOKEN }}" codeberg.org
-          for tag in latest sha-$SHORT_SHA $DATE; do
-            buildah manifest push --all \
-              --storage-driver=vfs \
-              "$IMAGE:$tag" "docker://$IMAGE:$tag"
-          done
+      - name: Log in to Codeberg registry
+        uses: docker/login-action@v3
+        with:
+          registry: codeberg.org
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.PACKAGES_TOKEN }}
+
+      - name: Compute tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,format=short
+            type=raw,value={{date 'YYYYMMDD'}}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
