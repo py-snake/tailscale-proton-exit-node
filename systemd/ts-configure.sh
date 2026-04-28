@@ -4,7 +4,7 @@ set -euo pipefail
 # Wait for tailscaled socket
 echo "Waiting for tailscaled..."
 for i in $(seq 1 30); do
-    if tailscale status >/dev/null 2>&1; then
+    if [ -S /run/tailscale/tailscaled.sock ]; then
         break
     fi
     if [ "$i" -eq 30 ]; then

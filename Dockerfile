@@ -2,7 +2,6 @@ FROM debian:bookworm-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     systemd \
-    systemd-resolved \
     wireguard-tools \
     iptables \
     iproute2 \
@@ -29,8 +28,9 @@ RUN rm -f /lib/systemd/system/multi-user.target.wants/* \
     /lib/systemd/system/sysinit.target.wants/systemd-tmpfiles-setup* \
     /lib/systemd/system/systemd-update-utmp*
 
-# IP forwarding
-RUN printf 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\n' \
+# IP forwarding + loose reverse-path filtering for the asymmetric exit-node routing
+# (packets enter via tailscale0, leave via proton0 — strict rp_filter would drop them)
+RUN printf 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\nnet.ipv4.conf.all.rp_filter = 2\nnet.ipv4.conf.default.rp_filter = 2\n' \
       > /etc/sysctl.d/99-forwarding.conf
 
 # Copy systemd units and scripts
@@ -47,8 +47,7 @@ RUN chmod +x /usr/local/bin/wg-config.sh \
               /usr/local/bin/healthcheck.sh
 
 # Enable services
-RUN systemctl enable systemd-networkd systemd-resolved tailscaled \
-      wg-config ts-configure kill-switch
+RUN systemctl enable tailscaled wg-config ts-configure kill-switch
 
 # Tailscale state persisted via volume
 VOLUME /var/lib/tailscale

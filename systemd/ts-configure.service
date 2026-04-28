@@ -1,8 +1,7 @@
 [Unit]
 Description=Configure Tailscale as exit node
-After=tailscaled.service systemd-networkd.service kill-switch.service
-Requires=tailscaled.service
-Wants=systemd-networkd-wait-online.service
+After=tailscaled.service wg-config.service kill-switch.service
+Requires=tailscaled.service wg-config.service
 
 [Service]
 Type=oneshot
