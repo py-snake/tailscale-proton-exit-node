@@ -14,8 +14,13 @@ jobs:
     steps:
       - uses: https://code.forgejo.org/actions/checkout@v4
 
-      - name: Install buildah
-        run: apt-get update -qq && apt-get install -y buildah ca-certificates
+      - name: Install buildah and QEMU
+        run: |
+          apt-get update -qq
+          apt-get install -y --no-install-recommends \
+            buildah ca-certificates qemu-user-static binfmt-support
+          update-binfmts --enable qemu-aarch64 || true
+          ls /proc/sys/fs/binfmt_misc/ || true
 
       - name: Build multi-arch manifest
         env:
