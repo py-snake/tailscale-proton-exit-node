@@ -30,7 +30,8 @@ RUN rm -f /lib/systemd/system/multi-user.target.wants/* \
 
 # IP forwarding + loose reverse-path filtering for the asymmetric exit-node routing
 # (packets enter via tailscale0, leave via proton0 — strict rp_filter would drop them)
-RUN printf 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\nnet.ipv4.conf.all.rp_filter = 2\nnet.ipv4.conf.default.rp_filter = 2\n' \
+RUN mkdir -p /etc/sysctl.d && \
+    printf 'net.ipv4.ip_forward = 1\nnet.ipv6.conf.all.forwarding = 1\nnet.ipv4.conf.all.rp_filter = 2\nnet.ipv4.conf.default.rp_filter = 2\n' \
       > /etc/sysctl.d/99-forwarding.conf
 
 # Copy systemd units and scripts
