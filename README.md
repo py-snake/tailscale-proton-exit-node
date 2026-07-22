@@ -2,7 +2,7 @@
 
 A single Docker container that acts as a **Tailscale exit node** routing all traffic through **ProtonVPN** via WireGuard.
 
-Uses systemd as init and systemd-networkd for WireGuard interface management, with smart routing that keeps Tailscale control traffic direct while sending exit-node traffic through the VPN tunnel.
+Uses systemd as init, with smart routing that keeps Tailscale control traffic direct while sending exit-node traffic through the VPN tunnel, and a built-in watchdog that recycles the tunnel if it stops working.
 
 ## How It Works
 
@@ -16,10 +16,11 @@ Tailscale peers ──► tailscale0 ──► proton0 (WireGuard) ──► Pro
                          at priority 6000 → VPN tunnel
 ```
 
-- **systemd-networkd** manages the WireGuard interface via `.netdev`/`.network` files
-- **FirewallMark + InvertRule** routing ensures Tailscale's own traffic bypasses the VPN
+- **wg-config** creates the `proton0` WireGuard interface directly with `ip`/`wg` (systemd-networkd can't match `.network` files to wg links in a container without udev)
+- **FwMark + inverted routing rule** ensures Tailscale's own traffic bypasses the VPN
 - **Kill switch** uses prohibit routes — if WireGuard drops, all traffic is blocked
 - **iptables MASQUERADE** NATs exit-node traffic through ProtonVPN
+- **vpn-watchdog** checks the tunnel every 30s and automatically rebuilds it if broken
 
 ## Quick Start
 
@@ -111,6 +112,27 @@ When `KILL_SWITCH=true` (the default), prohibit routes are installed at metric 9
 
 This is the same approach used by [protonwire](https://github.com/tprasadtp/protonwire).
 
+## Self-Healing and Health Checks
+
+A dead VPN tunnel is easy to miss: Tailscale's control traffic bypasses the tunnel, so the node stays "online" in your tailnet even when ProtonVPN routing is broken — clients stay connected but get no internet (the kill switch blocks their traffic rather than leaking it). The container handles this automatically:
+
+- **`vpn-watchdog.timer`** runs every 30 seconds inside the container and recycles the tunnel (re-runs `wg-config`) if any of these are true:
+  - the WireGuard handshake is more than 3 minutes stale (tunable via `WATCHDOG_HANDSHAKE_MAX_AGE`, seconds)
+  - the `proton0` interface is missing
+  - the fwmark policy rule or the VPN default route has disappeared
+- **Docker `HEALTHCHECK`** runs `healthcheck.sh` every 60 seconds, so `docker ps` reports `(healthy)` / `(unhealthy)` based on handshake freshness and Tailscale connectivity.
+- **Persistent journal** — a volume is mounted at `/var/log/journal`, so systemd logs survive container recreation and past incidents stay diagnosable.
+
+The kill-switch prohibit routes are not device-bound, so they stay active while the watchdog rebuilds the interface — traffic is blocked during recovery, never leaked.
+
+```bash
+# Watchdog activity
+docker compose exec tailscale-proton journalctl -u vpn-watchdog.service -n 20
+
+# Container health
+docker ps --filter name=tailscale-proton-exit
+```
+
 ## Verifying
 
 Check the container is working:
@@ -135,13 +157,13 @@ The container runs systemd as PID 1 with these services:
 
 | Service | Type | Purpose |
 |---------|------|---------|
-| `wg-config` | oneshot | Generates WireGuard `.netdev`/`.network` files from env vars |
-| `systemd-networkd` | system | Creates and manages the `proton0` WireGuard interface |
+| `wg-config` | oneshot | Creates the `proton0` WireGuard interface and routing policy from env vars |
 | `kill-switch` | oneshot | Installs prohibit routes (conditional on `KILL_SWITCH=true`) |
 | `tailscaled` | daemon | Tailscale daemon |
 | `ts-configure` | oneshot | Sets up iptables NAT, runs `tailscale up --advertise-exit-node` |
+| `vpn-watchdog` | timer (30s) | Recycles the tunnel if the handshake goes stale or routing breaks |
 
-Boot order: `wg-config` → `systemd-networkd` → `kill-switch` → `tailscaled` → `ts-configure`
+Boot order: `wg-config` → `kill-switch` → `tailscaled` → `ts-configure`, with `vpn-watchdog.timer` starting 90s after boot
 
 ## Switching Servers
 
