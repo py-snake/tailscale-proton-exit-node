@@ -16,9 +16,12 @@ services:
       - /tmp
     volumes:
       - ts-state:/var/lib/tailscale
+      - journal:/var/log/journal
     env_file:
       - .env
 
 volumes:
   ts-state:
+    driver: local
+  journal:
     driver: local

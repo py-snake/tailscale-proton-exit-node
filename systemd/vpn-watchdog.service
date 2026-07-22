@@ -1,0 +1,7 @@
+[Unit]
+Description=VPN tunnel watchdog (recycles proton0 when broken)
+After=wg-config.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/vpn-watchdog.sh

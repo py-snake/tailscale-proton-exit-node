@@ -41,17 +41,28 @@ COPY systemd/ts-configure.service /etc/systemd/system/ts-configure.service
 COPY systemd/ts-configure.sh      /usr/local/bin/ts-configure.sh
 COPY systemd/kill-switch.service  /etc/systemd/system/kill-switch.service
 COPY systemd/kill-switch.sh       /usr/local/bin/kill-switch.sh
+COPY systemd/vpn-watchdog.service /etc/systemd/system/vpn-watchdog.service
+COPY systemd/vpn-watchdog.timer   /etc/systemd/system/vpn-watchdog.timer
+COPY systemd/vpn-watchdog.sh      /usr/local/bin/vpn-watchdog.sh
 COPY healthcheck.sh               /usr/local/bin/healthcheck.sh
 RUN chmod +x /usr/local/bin/wg-config.sh \
               /usr/local/bin/ts-configure.sh \
               /usr/local/bin/kill-switch.sh \
+              /usr/local/bin/vpn-watchdog.sh \
               /usr/local/bin/healthcheck.sh
 
+# Persistent journal (mount a volume at /var/log/journal to keep logs across
+# container recreations — journald uses persistent storage when the dir exists)
+RUN mkdir -p /var/log/journal
+
 # Enable services
-RUN systemctl enable tailscaled wg-config ts-configure kill-switch
+RUN systemctl enable tailscaled wg-config ts-configure kill-switch vpn-watchdog.timer
 
 # Tailscale state persisted via volume
 VOLUME /var/lib/tailscale
+
+HEALTHCHECK --interval=60s --timeout=10s --start-period=120s --retries=3 \
+    CMD /usr/local/bin/healthcheck.sh
 
 STOPSIGNAL SIGRTMIN+3
 ENTRYPOINT ["/lib/systemd/systemd"]
