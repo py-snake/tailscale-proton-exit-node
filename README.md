@@ -36,8 +36,7 @@ Tailscale peers ─► tailscale0 ─► warp0 (WireGuard WARP) ─► Cloudflar
 
 ```bash
 # 0. Host prep (ROOTFUL podman — the container is privileged + systemd)
-sudo apt-get update && sudo apt-get install -y podman
-pipx install podman-compose        # or: sudo apt-get install -y podman-compose
+sudo apt-get update && sudo apt-get install -y podman podman-compose
 sudo mkdir -p /dev/net && [ -c /dev/net/tun ] || sudo mknod /dev/net/tun c 10 200
 echo 'net.ipv4.ip_forward=1' | sudo tee /etc/sysctl.d/99-tailscale.conf
 sudo sysctl --system
