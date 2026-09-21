@@ -37,6 +37,7 @@ Tailscale peers ─► tailscale0 ─► warp0 (WireGuard WARP) ─► Cloudflar
 |---|---|
 | `docker-compose.yml` | `wgcf-init` (one-shot) + `tailscale-warp` (the whole node) |
 | `register-warp.sh` | Downloads/verifies `wgcf`, registers account, writes `warp/.env.warp` |
+| `build-env-warp.sh` | Fallback: builds `warp/.env.warp` from a home-made `wgcf-profile.conf` (VPS IP blocked) |
 | `Dockerfile` | systemd image with tailscale + wireguard-tools + iptables |
 | `systemd/` | wg-config / kill-switch / ts-configure / vpn-watchdog units + scripts |
 | `healthcheck.sh` | Container health (handshake age + tailscale up) |
@@ -105,30 +106,14 @@ scp wgcf-account.toml wgcf-profile.conf ubuntu@<VPS-IP>:/path/to/repo/warp/
 ```
 
 ```bash
-# C. On the VPS: build warp/.env.warp from the profile (same format wgcf-init writes)
+# C. On the VPS: turn the profile into warp/.env.warp (one command)
 cd /path/to/repo
 ls -l warp/wgcf-profile.conf warp/wgcf-account.toml  # both must exist now
-getval() { sed -n "s/^$1[[:space:]]*=[[:space:]]*//p" warp/wgcf-profile.conf | head -1; }
-PRIVKEY="$(getval PrivateKey | tr -d ' \r')"
-PUBKEY="$(getval PublicKey | tr -d ' \r')"
-ADDRS="$(getval Address | tr -d ' \r')"
-ENDPOINT="$(getval Endpoint | tr -d ' \r')"
-ENDPOINT_HOST="${ENDPOINT%:*}"; ENDPOINT_PORT="${ENDPOINT##*:}"
-ENDPOINT_HOST="$(printf '%s' "$ENDPOINT_HOST" | tr -d '[]')"
-RESOLVED="$(getent ahostsv4 "$ENDPOINT_HOST" 2>/dev/null | awk '{print $1}' | head -1)"
-if [ -n "$RESOLVED" ]; then ENDPOINT_HOST="$RESOLVED"; fi
-cat > warp/.env.warp <<EOF
-# Generated manually from wgcf-profile.conf (VPS IP was blocked for wgcf register).
-WIREGUARD_ENDPOINT_IP=$ENDPOINT_HOST
-WIREGUARD_ENDPOINT_PORT=$ENDPOINT_PORT
-VPN_ENDPOINT_IP=$ENDPOINT_HOST
-VPN_ENDPOINT_PORT=$ENDPOINT_PORT
-WIREGUARD_PUBLIC_KEY=$PUBKEY
-WIREGUARD_PRIVATE_KEY=$PRIVKEY
-WIREGUARD_ADDRESSES=$ADDRS
-EOF
+./build-env-warp.sh
+# Expected: "Wrote warp/.env.warp:" + 7 KEY=value lines, ending with
+# "OK — 7 lines, no empty values after '='."
 chmod 600 warp/.env.warp
-cat warp/.env.warp  # verify: 7 lines, no empty values after '='
+cat warp/.env.warp  # spot-check: every line has a value after '='
 ```
 
 Then continue with step 3. Keep `warp/wgcf-account.toml` — future `sudo podman compose up wgcf-init` runs reuse it (`generate` only) and usually succeed even where `register` was blocked.
