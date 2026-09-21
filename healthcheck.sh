@@ -2,13 +2,13 @@
 set -e
 
 # Check WireGuard interface exists
-if ! ip link show proton0 >/dev/null 2>&1; then
-    echo "FAIL: proton0 interface missing"
+if ! ip link show warp0 >/dev/null 2>&1; then
+    echo "FAIL: warp0 interface missing"
     exit 1
 fi
 
 # Check for a recent WireGuard handshake (within last 3 minutes)
-LAST_HS=$(wg show proton0 latest-handshakes 2>/dev/null | awk '{print $2}')
+LAST_HS=$(wg show warp0 latest-handshakes 2>/dev/null | awk '{print $2}')
 if [ -z "$LAST_HS" ] || [ "$LAST_HS" -eq 0 ]; then
     echo "FAIL: no WireGuard handshake"
     exit 1

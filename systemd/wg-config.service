@@ -1,5 +1,5 @@
 [Unit]
-Description=Bring up proton0 WireGuard interface
+Description=Bring up warp0 (Cloudflare WARP) WireGuard interface
 Before=kill-switch.service tailscaled.service network-online.target
 After=systemd-sysctl.service
 
@@ -7,8 +7,7 @@ After=systemd-sysctl.service
 Type=oneshot
 RemainAfterExit=yes
 ExecStart=/usr/local/bin/wg-config.sh
-ExecStop=/sbin/ip link del proton0
-PassEnvironment=WG_PRIVATE_KEY WG_PEER_PUBLIC_KEY WG_ENDPOINT WG_ADDRESS WG_DNS
+ExecStop=/sbin/ip link del warp0
 
 [Install]
 WantedBy=multi-user.target

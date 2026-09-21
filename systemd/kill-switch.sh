@@ -4,14 +4,14 @@ set -euo pipefail
 # Kill switch using prohibit routes (same approach as protonwire).
 #
 # How it works:
-#   - Normal VPN routes are added at metric 500 by systemd-networkd
+#   - Normal VPN routes are added at metric 500 by wg-config.sh
 #   - Prohibit (blackhole) routes are added here at metric 900
-#   - When proton0 is UP: traffic matches metric-500 routes → goes through VPN
-#   - When proton0 is DOWN: metric-500 routes vanish → traffic hits metric-900
+#   - When warp0 is UP: traffic matches metric-500 routes → goes through WARP
+#   - When warp0 is DOWN: metric-500 routes vanish → traffic hits metric-900
 #     prohibit routes → all traffic is BLOCKED
 #
 # Excluded from kill switch (remain reachable):
-#   - 10.0.0.0/8      (LAN / ProtonVPN internal)
+#   - 10.0.0.0/8      (LAN)
 #   - 100.64.0.0/10   (Tailscale CGNAT)
 #   - 169.254.0.0/16  (link-local)
 #   - 172.16.0.0/12   (LAN)
@@ -22,13 +22,13 @@ if [ "${KILL_SWITCH:-false}" != "true" ]; then
     exit 0
 fi
 
-echo "Waiting for proton0 interface..."
+echo "Waiting for warp0 interface..."
 for i in $(seq 1 30); do
-    if ip link show proton0 >/dev/null 2>&1; then
+    if ip link show warp0 >/dev/null 2>&1; then
         break
     fi
     if [ "$i" -eq 30 ]; then
-        echo "ERROR: proton0 not found, cannot set up kill switch" >&2
+        echo "ERROR: warp0 not found, cannot set up kill switch" >&2
         exit 1
     fi
     sleep 1
@@ -76,4 +76,4 @@ for subnet in "${SUBNETS[@]}"; do
     ip -4 route replace table "$TABLE" prohibit "$subnet" metric 900 2>/dev/null || true
 done
 
-echo "Kill switch active. Traffic will be blocked if proton0 goes down."
+echo "Kill switch active. Traffic will be blocked if warp0 goes down."

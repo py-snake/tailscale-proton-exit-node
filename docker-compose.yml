@@ -1,0 +1,49 @@
+services:
+  # One-shot automated Cloudflare WARP registration (via wgcf).
+  # Run once (or to rotate identity):  podman compose up wgcf-init
+  # Generates ./warp/wgcf-profile.conf + ./warp/.env.warp, mounted read-only
+  # into the main container so wg-config.sh reads the WARP credentials.
+  wgcf-init:
+    image: docker.io/alpine:latest
+    container_name: wgcf-init
+    profiles: ["init"]
+    working_dir: /warp
+    environment:
+      - WGCF_VERSION=${WGCF_VERSION:-latest}
+    volumes:
+      - ./warp:/warp
+      - ./register-warp.sh:/register-warp.sh:ro
+    command: ["/bin/sh", "-c", "apk add --no-cache curl ca-certificates bind-tools && exec /bin/sh /register-warp.sh"]
+    restart: "no"
+
+  # Single container: systemd PID1 running tailscaled + warp0 (Cloudflare WARP
+  # WireGuard). Tailscale control/STUN/P2P goes direct (real VPS IP, hole
+  # punching works); exit-node traffic is policy-routed into WARP. Includes a
+  # kill switch and a 30s watchdog. Needs rootful podman (privileged).
+  tailscale-warp:
+    build: .
+    container_name: tailscale-warp-exit
+    hostname: ${TS_HOSTNAME:-tailscale-warp}
+    restart: unless-stopped
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    tmpfs:
+      - /run
+      - /run/lock
+      - /tmp
+    volumes:
+      - ts-state:/var/lib/tailscale
+      - journal:/var/log/journal
+      - ./warp:/warp:ro
+    env_file:
+      - .env
+
+volumes:
+  ts-state:
+    driver: local
+  journal:
+    driver: local

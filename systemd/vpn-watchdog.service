@@ -1,7 +1,8 @@
 [Unit]
-Description=VPN tunnel watchdog (recycles proton0 when broken)
+Description=VPN tunnel watchdog (recycles warp0 when broken)
 After=wg-config.service
 
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/vpn-watchdog.sh
+PassEnvironment=WATCHDOG_HANDSHAKE_MAX_AGE

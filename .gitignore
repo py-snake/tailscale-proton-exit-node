@@ -1,4 +1,5 @@
+# Local config with TS_AUTHKEY
 .env
-*.swp
-*.swo
-*~
+
+# WARP identity + keys (regenerable via wgcf-init, never commit)
+warp/

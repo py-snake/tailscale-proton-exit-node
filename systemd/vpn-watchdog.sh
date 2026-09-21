@@ -1,12 +1,11 @@
 #!/bin/bash
 set -u
 
-# Recycle the proton0 tunnel when it stops working.
+# Recycle the warp0 (WARP) tunnel when it stops working.
 #
 # Two failure classes are covered:
-#   1. Handshake stale/missing — Proton server maintenance, NAT mapping loss,
-#      or session eviction. Recreating the interface forces a fresh handshake
-#      cycle from a clean state.
+#   1. Handshake stale/missing — Cloudflare maintenance, NAT mapping loss,
+#      or session eviction. Recreating the interface forces a fresh handshake.
 #   2. Routing policy lost — the fwmark rule or table-51820 default route
 #      vanished while the handshake still looks fine ("connected but not
 #      routing"). Re-running wg-config reinstalls both.
@@ -19,7 +18,7 @@ THRESHOLD="${WATCHDOG_HANDSHAKE_MAX_AGE:-180}"
 
 handshake_age() {
     local last now up_us boot_us
-    last=$(wg show proton0 latest-handshakes 2>/dev/null | awk 'NR==1{print $2}')
+    last=$(wg show warp0 latest-handshakes 2>/dev/null | awk 'NR==1{print $2}')
     if [ -z "${last:-}" ]; then
         echo -1
         return
@@ -38,7 +37,7 @@ handshake_age() {
 
 AGE=$(handshake_age)
 if [ "$AGE" -lt 0 ]; then
-    echo "proton0 interface missing — recycling tunnel"
+    echo "warp0 interface missing — recycling tunnel"
 elif [ "$AGE" -gt "$THRESHOLD" ]; then
     echo "WireGuard handshake stale (${AGE}s > ${THRESHOLD}s) — recycling tunnel"
 elif ! ip -4 rule show | grep -q "fwmark 0xca6c"; then
